@@ -32,9 +32,9 @@
     <th>Last modified</th>
     <th>Size</th>
 </tr>
-<tr><th colspan="5"><hr></th></tr>
+<tr><th colspan="4"><hr></th></tr>
 <tr>
-    <td><a href="{{ base_url }}{% if not resource.get_escaped_path %}/{% endif %}{{ resource.get_parent.get_escaped_path }}">Parent Directory</a></td>
+    <td colspan="4"><a href="{{ base_url }}{% if not resource.get_escaped_path %}/{% endif %}{{ resource.get_parent.get_escaped_path }}">Parent Directory</a></td>
 </tr>
 {% for child in resource.get_children %}
 <tr>
@@ -44,7 +44,7 @@
     <td align="right">{{ child.getcontentlength|filesizeformat }}</td>
 </tr>
 {% endfor %}
-<tr><th colspan="5"><hr></th></tr>
+<tr><th colspan="4"><hr></th></tr>
 </table>
 <p>DjangoDav - <a href="https://github.com/meteozond/djangodav/">https://github.com/meteozond/djangodav/</a></p>
 </body>
