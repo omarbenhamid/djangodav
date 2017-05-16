@@ -6,21 +6,28 @@ except ImportError:
 from sys import version_info as python_version
 from django.utils.timezone import now
 from lxml import etree
+import mimetypes
+import urllib
 
 from django.http import HttpResponseForbidden, HttpResponseNotAllowed, HttpResponseBadRequest, \
-    HttpResponseNotModified, HttpResponseRedirect, Http404
+    HttpResponseNotModified, HttpResponseRedirect, Http404, HttpResponse
 from django.utils.decorators import method_decorator
 from django.utils.functional import cached_property
-from django.utils.http import parse_etags
+from django.utils.http import parse_etags, http_date
 from django.views.decorators.csrf import csrf_exempt
 from django.views.generic import TemplateView
 
-from djangodav.responses import ResponseException, HttpResponsePreconditionFailed, HttpResponseCreated, HttpResponseNoContent, \
+from djangodav.responses import HttpResponsePreconditionFailed, HttpResponseCreated, HttpResponseNoContent, \
     HttpResponseConflict, HttpResponseMediatypeNotSupported, HttpResponseBadGateway, \
-    HttpResponseMultiStatus, HttpResponseLocked, HttpResponse
+    HttpResponseMultiStatus, HttpResponseLocked, RedirectFSException, ResponseException, AsSendFileFS
 from djangodav.utils import WEBDAV_NSMAP, D, url_join, get_property_tag_list, rfc1123_date
 from djangodav import VERSION as djangodav_version
 from django import VERSION as django_version, get_version
+
+try:
+    import sendfile
+except ImportError:
+    sendfile = None
 
 PATTERN_IF_DELIMITER = re.compile(r'(<([^>]+)>)|(\(([^\)]+)\))')
 
@@ -195,7 +202,24 @@ class DavView(TemplateView):
             response['ETag'] = self.resource.getetag
             if not head:
                 response['Content-Length'] = self.resource.getcontentlength
-                response.content = self.resource.read()
+                try:
+                    response.content = self.resource.read()
+                except AsSendFileFS:
+                    assert sendfile is not None, "django-sendfile is not installed."
+                    full_path = self.resource.get_abs_path().encode('utf-8')
+                    if self.resource.quote:
+                        full_path = urllib.quote(full_path)
+                    response = sendfile(request, full_path)
+                    return response
+                except RedirectFSException:
+                    response = HttpResponse()
+                    response['X-Accel-Redirect'] = url_join(self.resource.prefix, self.resource.get_path().encode('utf-8'))
+                    response['X-Accel-Charset'] = 'utf-8'
+                    response['Content-Type'] = mimetypes.guess_type(self.resource.displayname)
+                    response['Content-Length'] = self.resource.getcontentlength
+                    response['Last-Modified'] = http_date(self.resource.getlastmodified)
+                    response['ETag'] = self.resource.getetag
+                    raise ResponseException(response)
         elif not head:
             response = super(DavView, self).get(request, *args, **kwargs)
         response['Last-Modified'] = self.resource.getlastmodified
