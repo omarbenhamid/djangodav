@@ -204,7 +204,7 @@ class DavView(View):
                     full_path = self.resource.get_abs_path().encode('utf-8')
                     if self.resource.quote:
                         full_path = urllib.quote(full_path)
-                    response = sendfile(request, full_path)
+                    response = sendfile.sendfile(request, full_path)
                     return response
                 except RedirectFSException:
                     response = HttpResponse()
