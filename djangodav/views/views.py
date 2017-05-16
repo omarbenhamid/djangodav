@@ -25,7 +25,10 @@ from djangodav.utils import WEBDAV_NSMAP, D, url_join, get_property_tag_list, rf
 from djangodav import VERSION as djangodav_version
 from django import VERSION as django_version, get_version
 
-from sendfile import sendfile
+try:
+    import sendfile
+except ImportError:
+    sendfile = None
 
 PATTERN_IF_DELIMITER = re.compile(r'(<([^>]+)>)|(\(([^\)]+)\))')
 
