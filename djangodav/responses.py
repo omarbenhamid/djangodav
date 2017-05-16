@@ -41,6 +41,14 @@ class ResponseException(Exception):
         self.response = response
 
 
+class AsSendFileFS(Exception):
+    pass
+
+
+class RedirectFSException(Exception):
+    pass
+
+
 class HttpResponsePreconditionFailed(HttpResponse):
     status_code = httplib.PRECONDITION_FAILED
 

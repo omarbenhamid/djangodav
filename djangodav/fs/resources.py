@@ -18,21 +18,13 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with DjangoDav.  If not, see <http://www.gnu.org/licenses/>.
-import hashlib
-import mimetypes
-from sys import getfilesystemencoding
-import os
 import datetime
+import os
 import shutil
-import urllib
-
-from django.http import HttpResponse
-from django.utils.http import http_date
+from sys import getfilesystemencoding
 
 from djangodav.base.resources import BaseDavResource
-from djangodav.responses import ResponseException
-from djangodav.utils import safe_join, url_join
-
+from djangodav.utils import url_join
 
 fs_encoding = getfilesystemencoding()
 
@@ -43,6 +35,8 @@ class BaseFSDavResource(BaseDavResource):
     python's os library to do most of the work."""
 
     root = None
+    quote = False
+    prefix = "/"
 
     def get_abs_path(self):
         """Return the absolute path of the resource. Used internally to interface with
@@ -129,33 +123,3 @@ class DummyWriteFSDavResource(BaseFSDavResource):
 
 class DummyFSDAVResource(DummyReadFSDavResource, DummyWriteFSDavResource, BaseFSDavResource):
     pass
-
-
-class SendFileFSDavResource(BaseFSDavResource):
-    quote = False
-
-    def read(self):
-        response = HttpResponse()
-        full_path = self.get_abs_path().encode('utf-8')
-        if self.quote:
-            full_path = urllib.quote(full_path)
-        response['X-SendFile'] = full_path
-        response['Content-Type'] = mimetypes.guess_type(self.displayname)
-        response['Content-Length'] = self.getcontentlength
-        response['Last-Modified'] = http_date(self.getlastmodified)
-        response['ETag'] = self.getetag
-        raise ResponseException(response)
-
-
-class RedirectFSDavResource(BaseFSDavResource):
-    prefix = "/"
-
-    def read(self):
-        response = HttpResponse()
-        response['X-Accel-Redirect'] = url_join(self.prefix, self.get_path().encode('utf-8'))
-        response['X-Accel-Charset'] = 'utf-8'
-        response['Content-Type'] = mimetypes.guess_type(self.displayname)
-        response['Content-Length'] = self.getcontentlength
-        response['Last-Modified'] = http_date(self.getlastmodified)
-        response['ETag'] = self.getetag
-        raise ResponseException(response)
