@@ -12,9 +12,8 @@ from django.http import HttpResponseForbidden, HttpResponseNotAllowed, HttpRespo
 from django.utils.decorators import method_decorator
 from django.utils.functional import cached_property
 from django.utils.http import parse_etags
-from django.shortcuts import render_to_response
 from django.views.decorators.csrf import csrf_exempt
-from django.views.generic import View
+from django.views.generic import TemplateView
 
 from djangodav.responses import ResponseException, HttpResponsePreconditionFailed, HttpResponseCreated, HttpResponseNoContent, \
     HttpResponseConflict, HttpResponseMediatypeNotSupported, HttpResponseBadGateway, \
@@ -25,7 +24,7 @@ from django import VERSION as django_version, get_version
 
 PATTERN_IF_DELIMITER = re.compile(r'(<([^>]+)>)|(\(([^\)]+)\))')
 
-class DavView(View):
+class DavView(TemplateView):
     resource_class = None
     lock_class = None
     acl_class = None
@@ -173,6 +172,12 @@ class DavView(View):
                 cond_if = '<*>' + cond_if
             #for (tmpurl, url, tmpcontent, content) in PATTERN_IF_DELIMITER.findall(cond_if):
 
+    def get_context_data(self, **kwargs):
+        context = super(DavView, self).get_context_data(**kwargs)
+        context['resource'] = self.resource
+        context['base_url'] = self.base_url
+        return context
+
     def get(self, request, path, head=False, *args, **kwargs):
         if not self.resource.exists:
             raise Http404("Resource doesn't exists")
@@ -192,7 +197,7 @@ class DavView(View):
                 response['Content-Length'] = self.resource.getcontentlength
                 response.content = self.resource.read()
         elif not head:
-            response = render_to_response(self.template_name, dict(resource=self.resource, base_url=self.base_url))
+            response = super(DavView, self).get(request, *args, **kwargs)
         response['Last-Modified'] = self.resource.getlastmodified
         return response
 
