@@ -201,7 +201,7 @@ class DavView(View):
                     response.content = self.resource.read()
                 except AsSendFileFS:
                     assert sendfile is not None, "django-sendfile is not installed."
-                    full_path = self.resource.get_abs_path().encode('utf-8')
+                    full_path = self.resource.get_abs_path()
                     if self.resource.quote:
                         full_path = urllib.quote(full_path)
                     response = sendfile.sendfile(request, full_path)
