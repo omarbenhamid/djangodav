@@ -281,7 +281,7 @@ class DavView(TemplateView):
             return HttpResponseBadRequest('Destination header missing.')
         dparts = urlparse.urlparse(dst)
         sparts = urlparse.urlparse(request.build_absolute_uri())
-        if sparts.scheme != dparts.scheme or sparts.netloc != dparts.netloc:
+        if sparts.scheme != dparts.scheme or sparts.hostname != dparts.hostname:
             return HttpResponseBadGateway('Source and destination must have the same scheme and host.')
         # adjust path for our base url:
         dst = self.get_resource(path=dparts.path[len(self.base_url):])
