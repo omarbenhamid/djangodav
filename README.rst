@@ -82,25 +82,53 @@ Added FSResource and DBResource to provide file system and data base access.
 Xml library usage is replaced with lxml to achieve proper xml generation code readability.
 
 
+Known Issues / Limitations
+--------------------------
+
 Basic Authentication on Windows
--------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Be careful when using Basic Authentication on Windows, as it is not enabled by default (for non SSL sites). You can
 either set ``BasicAuthLevel`` to ``2`` in the `Windows Registry <http://www.windowspage.de/tipps/022703.html>`_ , or
 just make sure your site uses SSL and has a valid SSL certificate.
 
 
+File Size Limit of 47 MB on Windows (Error 0x800700DF)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Windows enforces a 47 MB limit on WebDav files. See `this issue on Microsoft Answers <https://answers.microsoft.com/en-us/ie/forum/ie8-windows_xp/error-0x800700df-the-file-size-exceeds-the-limit/d208bba6-920c-4639-bd45-f345f462934f>`_ 
+aswell as `this issue on StackExchange <https://sharepoint.stackexchange.com/questions/119302/error-0x800700df-the-file-size-exceeds-the-limit-allowed-and-cannot-be-saved>`_.
+It can be fixed by increasing the registry parameter ``HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\WebClient\Parameters`` to ``4294967295``.
+
+Another way to fix this issue is using a dedicated WebDav client for Windows.
+
+Examples / Getting started
+--------------------------
+
+1. Install ``djangodav`` from this repo: ``pip install git+https://github.com/anx-ckreuzberger/djangodav``
+
+2. Add ``djangodav`` and ``rest_framework`` to your ``INSTALLED_APPS``:
+
+.. code-block:: python
+
+    INSTALLED_APPS = [
+        ...
+        # djangodav
+        'djangodav',
+        # rest_framework neeeds to be here for templates
+        'rest_framework',
+    ]
+
+
 Example 1: Create a simple filesystem webdav resource
------------------------------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 This will just host the provided directory ``/path/to/folder``, without any permission handling.
 
 1. Create resources.py
-~~~~~~~~~~~~~~~~~~~~~~
 
 .. code:: python
 
-    from django.conf import settings
     from djangodav.base.resources import MetaEtagMixIn
     from djangodav.fs.resources import DummyFSDAVResource
 
@@ -109,7 +137,6 @@ This will just host the provided directory ``/path/to/folder``, without any perm
 
 
 2. Register WebDav view in urls.py
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code:: python
 
@@ -129,12 +156,11 @@ This will just host the provided directory ``/path/to/folder``, without any perm
 
 
 Example 2: Create a simple database webdav resource
----------------------------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 This example is a bit more complex, as it requires two Django models and some handling.
 
 1. Create the following models in models.py
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code:: python
 
@@ -177,7 +203,6 @@ This example is a bit more complex, as it requires two Django models and some ha
 
 
 2. Create resources.py
-~~~~~~~~~~~~~~~~~~~~~~
 
 .. code:: python
 
@@ -242,7 +267,6 @@ This example is a bit more complex, as it requires two Django models and some ha
 
 
 3. Register WebDav view in urls.py
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code:: python
 
