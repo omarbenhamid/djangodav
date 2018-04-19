@@ -1,3 +1,6 @@
+# Refactoring, Django 1.11 compatibility, cleanups, bugfixes (c) 2018 Christian Kreuzberger <ckreuzberger@anexia-it.com>
+# All rights reserved.
+#
 # Portions (c) 2014, Alexander Klimenko <alex@erix.ru>
 # All rights reserved.
 #
@@ -25,6 +28,7 @@ from django.utils.functional import cached_property
 from django.utils.timezone import now
 from djangodav.base.resources import BaseDavResource
 from djangodav.utils import url_join
+from functools import reduce
 
 
 class BaseDBDavResource(BaseDavResource):
@@ -109,7 +113,7 @@ class BaseDBDavResource(BaseDavResource):
     def read(self):
         raise NotImplementedError
 
-    def write(self, content):
+    def write(self, content, temp_file=None):
         raise NotImplementedError
 
     def delete(self):
@@ -180,6 +184,18 @@ class NameLookupDBDavMixIn(object):
             raise qs.model.DoesNotExist()
 
     def copy_object(self, destination):
+        """
+        Copy an object to a destination
+
+        Collections (directories) are just copied within the database.
+        Files are copied by duplicating the file within the storage, and also inserting a new element into our database
+        :param destination:
+        :return:
+        """
+        print("in my copy object method")
+
+        # ToDo: When we "copy" a file (not a collection), we should also physically copy the file
+
         self.obj.pk = None
         name = destination.path[-1]
         collection = self.clone(destination.get_parent_path()).obj
@@ -187,9 +203,17 @@ class NameLookupDBDavMixIn(object):
         setattr(self.obj, self.collection_attribute, collection)
         setattr(self.obj, self.created_attribute, now())
         setattr(self.obj, self.modified_attribute, now())
+
         self.obj.save(force_insert=True)
 
     def move_object(self, destination):
+        """
+        Move an object to a destination
+
+        This basically just changes the name and the collection (directory) of an element
+        :param destination:
+        :return:
+        """
         name = destination.path[-1]
         collection = self.clone(destination.get_parent_path()).obj
         setattr(self.obj, self.name_attribute, name)

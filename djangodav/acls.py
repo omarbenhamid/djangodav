@@ -1,3 +1,6 @@
+# Refactoring, Django 1.11 compatibility, cleanups, bugfixes (c) 2018 Christian Kreuzberger <ckreuzberger@anexia-it.com>
+# All rights reserved.
+#
 # Portions (c) 2014, Alexander Klimenko <alex@erix.ru>
 # All rights reserved.
 #

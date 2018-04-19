@@ -1,3 +1,6 @@
+# Refactoring, Django 1.11 compatibility, cleanups, bugfixes (c) 2018 Christian Kreuzberger <ckreuzberger@anexia-it.com>
+# All rights reserved.
+#
 # Portions (c) 2014, Alexander Klimenko <alex@erix.ru>
 # All rights reserved.
 #
@@ -36,7 +39,7 @@ class MockResource(MagicMock, BaseDavResource):
 
 
 class MockObject(MockResource):
-    getetag = "0" * 40
+    etag = "0" * 40
     is_object = True
     is_collection = False
     getcontentlength = 42

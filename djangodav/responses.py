@@ -1,3 +1,6 @@
+# Refactoring, Django 1.11 compatibility, cleanups, bugfixes (c) 2018 Christian Kreuzberger <ckreuzberger@anexia-it.com>
+# All rights reserved.
+#
 # Portions (c) 2014, Alexander Klimenko <alex@erix.ru>
 # All rights reserved.
 #
@@ -39,14 +42,6 @@ class ResponseException(Exception):
     def __init__(self, response, *args, **kwargs):
         super(ResponseException, self).__init__('Response excepted', *args, **kwargs)
         self.response = response
-
-
-class AsSendFileFS(Exception):
-    pass
-
-
-class RedirectFSException(Exception):
-    pass
 
 
 class HttpResponsePreconditionFailed(HttpResponse):

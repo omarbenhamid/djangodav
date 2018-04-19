@@ -1,3 +1,6 @@
+# Refactoring, Django 1.11 compatibility, cleanups, bugfixes (c) 2018 Christian Kreuzberger <ckreuzberger@anexia-it.com>
+# All rights reserved.
+#
 # Portions (c) 2014, Alexander Klimenko <alex@erix.ru>
 # All rights reserved.
 #
@@ -48,6 +51,8 @@ class BaseDavResource(object):
 
     @property
     def displayname(self):
+        if len(self.path) == 0:
+            return '/'
         if not self.path:
             return None
         return self.path[-1]
@@ -77,6 +82,7 @@ class BaseDavResource(object):
 
     @property
     def getcontentlength(self):
+        # ToDo: This is a property... it should not have a "get" in the name -> rename it
         raise NotImplementedError()
 
     @property
@@ -86,6 +92,7 @@ class BaseDavResource(object):
 
     @property
     def getlastmodified(self):
+        # ToDo: This is a property... it should not have a "get" in the name -> rename it
         """Return the modified time as http_date."""
         return rfc1123_date(self.get_modified())
 
@@ -98,7 +105,8 @@ class BaseDavResource(object):
         raise NotImplementedError()
 
     @property
-    def getetag(self):
+    def etag(self):
+        # ToDo: This is a property... it should not have a "get" in the name -> rename it
         raise NotImplementedError()
 
     def copy(self,  destination, depth=-1):
@@ -151,7 +159,7 @@ class BaseDavResource(object):
     def move_object(self, destination):
         raise NotImplemented()
 
-    def write(self, content):
+    def write(self, content, temp_file=None):
         raise NotImplementedError()
 
     def read(self):
@@ -185,14 +193,14 @@ class BaseDavResource(object):
 
 class MetaEtagMixIn(object):
     @property
-    def getetag(self):
+    def etag(self):
         """Calculate an etag for this resource. The default implementation uses an md5 sub of the
         absolute path modified time and size. Can be overridden if resources are not stored in a
         file system. The etag is used to detect changes to a resource between HTTP calls. So this
         needs to change if a resource is modified."""
         hashsum = md5()
-        hashsum.update(self.displayname)
-        hashsum.update(str(self.creationdate))
-        hashsum.update(str(self.getlastmodified))
-        hashsum.update(str(self.getcontentlength))
+        hashsum.update(self.displayname.encode())
+        hashsum.update(str(self.creationdate).encode())
+        hashsum.update(str(self.getlastmodified).encode())
+        hashsum.update(str(self.getcontentlength).encode())
         return hashsum.hexdigest()

@@ -1,3 +1,6 @@
+# Refactoring, Django 1.11 compatibility, cleanups, bugfixes (c) 2018 Christian Kreuzberger <ckreuzberger@anexia-it.com>
+# All rights reserved.
+#
 # Portions (c) 2014, Alexander Klimenko <alex@erix.ru>
 # All rights reserved.
 #
@@ -23,6 +26,7 @@ from django.http import HttpResponse, HttpRequest, Http404
 from djangodav.acls import FullAcl
 from djangodav.locks import DummyLock
 from djangodav.responses import ResponseException
+# ToDo: do not use lxml, use defusedxml to avoid XML vulnerabilities
 from lxml import etree
 
 from djangodav.base.tests.resources import MockCollection, MockObject, MissingMockCollection, MissingMockObject
@@ -251,7 +255,7 @@ class TestView(TestCase):
                 'CONTENT_LENGTH': '44'
             },
             method='GET',
-            read=Mock(side_effect=[u"<?xml version=\"1.0\" encoding=\"utf-8\"?>\n", u"<foo/>", u""])
+            read=Mock(side_effect=["<?xml version=\"1.0\" encoding=\"utf-8\"?>\n", "<foo/>", ""])
         )
         v = DavView(request=request, get=Mock(return_value=HttpResponse()), _allowed_methods=Mock(return_value=['GET']))
         v.dispatch(request, '/path/')

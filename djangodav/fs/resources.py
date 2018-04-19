@@ -1,3 +1,6 @@
+# Refactoring, Django 1.11 compatibility, cleanups, bugfixes (c) 2018 Christian Kreuzberger <ckreuzberger@anexia-it.com>
+# All rights reserved.
+#
 # Portions (c) 2014, Alexander Klimenko <alex@erix.ru>
 # All rights reserved.
 #
@@ -36,7 +39,6 @@ class BaseFSDavResource(BaseDavResource):
 
     root = None
     quote = False
-    prefix = "/"
 
     def get_abs_path(self):
         """Return the absolute path of the resource. Used internally to interface with
@@ -74,16 +76,20 @@ class BaseFSDavResource(BaseDavResource):
 
     def get_children(self):
         """Return an iterator of all direct children of this resource."""
-        for child in os.listdir(self.get_abs_path()):
-            try:
-                is_unicode = isinstance(child, unicode)
-            except NameError:  # Python 3 fix
-                is_unicode = isinstance(child, str)
-            if not is_unicode:
-                child = child.decode(fs_encoding)
-            yield self.clone(url_join(*(self.path + [child])))
+        # make sure the current object is a directory
+        path = self.get_abs_path()
 
-    def write(self, content):
+        if os.path.isdir(path):
+            for child in os.listdir(path):
+                try:
+                    is_unicode = isinstance(child, str)
+                except NameError:  # Python 3 fix
+                    is_unicode = isinstance(child, str)
+                if not is_unicode:
+                    child = child.decode(fs_encoding)
+                yield self.clone(url_join(*(self.path + [child])))
+
+    def write(self, content, temp_file=None):
         raise NotImplementedError
 
     def read(self):
@@ -111,14 +117,22 @@ class BaseFSDavResource(BaseDavResource):
 
 class DummyReadFSDavResource(BaseFSDavResource):
     def read(self):
-        with open(self.get_abs_path(), 'r') as f:
-            return f.read()
+        return open(self.get_abs_path(), 'rb')
 
 
 class DummyWriteFSDavResource(BaseFSDavResource):
-    def write(self, request):
-        with file(self.get_abs_path(), 'w') as dst:
-            shutil.copyfileobj(request, dst)
+    """
+    Provides a "dummy" write method for FS Dav Resources
+    """
+    def write(self, request, temp_file=None):
+        print("temp_file=", temp_file)
+        if temp_file:
+            # move temp file (e.g., coming from nginx)
+            shutil.move(temp_file, self.get_abs_path())
+        else:
+            # open binary file and write to disk
+            with open(self.get_abs_path(), 'wb') as dst:
+                shutil.copyfileobj(request, dst)
 
 
 class DummyFSDAVResource(DummyReadFSDavResource, DummyWriteFSDavResource, BaseFSDavResource):

@@ -22,5 +22,10 @@
 *.log
 *.pot
 *.pyc
+__pycache__
 env
 .idea
+.eggs
+*.egg-info
+dist
+build

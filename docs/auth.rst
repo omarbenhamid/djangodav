@@ -10,6 +10,14 @@ Most of them are already developed in the api other libraries. So we provide mix
 Framework or Tastipie authentication layer support.
 
 
+Basic Authentication on Windows
+-------------------------------
+
+Be careful when using Basic Authentication on Windows, as it is not enabled by default (for non SSL sites). You can
+either set ``BasicAuthLevel`` to ``2`` in the `Windows Registry <http://www.windowspage.de/tipps/022703.html>'_ , or
+just make sure your site uses SSL and has a valid SSL certificate.
+
+
 Using Django REST framework authentication
 ------------------------------------------
 

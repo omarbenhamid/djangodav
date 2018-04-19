@@ -1,5 +1,8 @@
 #!/usr/bin/env python
 #
+# Refactoring, Django 1.11 compatibility, cleanups, bugfixes (c) 2018 Christian Kreuzberger <ckreuzberger@anexia-it.com>
+# All rights reserved.
+#
 # Portions (c) 2014, Alexander Klimenko <alex@erix.ru>
 # All rights reserved.
 #
@@ -27,26 +30,31 @@ from setuptools import setup, find_packages
 setup(
     name='DjangoDav',
     version=__import__('djangodav').__version__,
-    description=('A WebDAV server for Django.'),
+    description=('A WebDav server for Django'),
     long_description = open('README.rst').read(),
-    author='Alexander Klimenko',
-    author_email='alex@erix.ru',
-    url='https://github.com/meteozond/djangodav',
+    author='Christian Kreuzberger',
+    author_email='ckreuzberger@anexia-it.com',
+    url='https://github.com/anx-ckreuzberger/djangodav',
     packages=find_packages(),
     classifiers=[
         'Development Status :: 4 - Beta',
         'Environment :: Web Environment',
         'Framework :: Django',
+        'Framework :: Django :: 1.11',
+        'Framework :: Django :: 2.0',
         'License :: OSI Approved :: GNU Affero General Public License v3',
         'Operating System :: OS Independent',
         'Programming Language :: Python',
         "Programming Language :: Python :: 2.7",
-        "Programming Language :: Python :: 2.6",
         "Programming Language :: Python :: 3.4",
+        "Programming Language :: Python :: 3.5",
+        "Programming Language :: Python :: 3.6",
+        "Programming Language :: Python :: 3.7",
         'Topic :: Software Development :: Libraries :: Python Modules'
     ],
-    install_requires=["lxml", "Django>=1.3.0"],
-    tests_require=["Django>=1.3.0", "mock==1.0.1"],
+    # ToDo: remove lxml, replace with defusedxml for security reasons!!!
+    install_requires=["lxml", "Django>=1.11.0", "defusedxml"],
+    tests_require=["Django>=1.11.0", "mock==1.0.1"],
     include_package_data=True,
     zip_safe=False,
     test_suite='runtests.runtests'

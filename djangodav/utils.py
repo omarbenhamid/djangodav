@@ -1,3 +1,6 @@
+# Refactoring, Django 1.11 compatibility, cleanups, bugfixes (c) 2018 Christian Kreuzberger <ckreuzberger@anexia-it.com>
+# All rights reserved.
+#
 # Portions (c) 2014, Alexander Klimenko <alex@erix.ru>
 # All rights reserved.
 #
@@ -20,14 +23,22 @@
 # along with DjangoDav.  If not, see <http://www.gnu.org/licenses/>.
 
 
-import datetime, time, calendar
+import datetime
+import time
+import calendar
+import unicodedata
+
 from wsgiref.handlers import format_date_time
+
+from django.utils.http import urlquote
 from django.utils.feedgenerator import rfc2822_date
 
 try:
     from email.utils import parsedate_tz
 except ImportError:
     from email.Utils import parsedate_tz
+
+# ToDo: do not use lxml, use defusedxml to avoid XML vulnerabilities
 import lxml.builder as lb
 
 # Sun, 06 Nov 1994 08:49:37 GMT  ; RFC 822, updated by RFC 1123
@@ -61,7 +72,7 @@ def get_property_tag(res, name):
         return D(name)
     try:
         if hasattr(res, name):
-            return D(name, unicode(getattr(res, name)))
+            return D(name, str(getattr(res, name)))
     except AttributeError:
         return
 
@@ -130,3 +141,19 @@ def parse_time(timestring):
     if value is None:
         return
     return calendar.timegm(value)
+
+
+def rfc5987_content_disposition(file_name, disposition_type="attachment"):
+    """
+    Proccesses a filename that might contain unicode data, and returns it as a proper rfc 5987 compatible header
+    :param file_name:
+    :param disposition_type: either "attachment" or "inline"
+    :return:
+    """
+    ascii_name = unicodedata.normalize('NFKD', file_name).encode('ascii', 'ignore').decode()
+    header = '{}; filename="{}"'.format(disposition_type, ascii_name)
+    if ascii_name != file_name:
+        quoted_name = urlquote(file_name)
+        header += '; filename*=UTF-8\'\'{}'.format(quoted_name)
+
+    return header

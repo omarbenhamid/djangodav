@@ -1,47 +1,53 @@
-import urllib, re
+import os
+import re
+
+# import urllib.parse
 try:
+    # Python 2.7
     import urlparse
 except ImportError:
+    # Python 3
     from urllib import parse as urlparse
-from sys import version_info as python_version
-from django.utils.timezone import now
-from lxml import etree
-import mimetypes
-import urllib
 
+# import lxml xml parser
+from lxml import etree
+# use defusedxmls parse function
+from defusedxml.lxml import parse
+
+from django.conf import settings
 from django.http import HttpResponseForbidden, HttpResponseNotAllowed, HttpResponseBadRequest, \
-    HttpResponseNotModified, HttpResponseRedirect, Http404, HttpResponse
+    HttpResponseRedirect, Http404, HttpResponse, FileResponse
 from django.utils.decorators import method_decorator
 from django.utils.functional import cached_property
-from django.utils.http import parse_etags, http_date
+from django.utils.http import urlquote
+from django.utils.timezone import now
 from django.views.decorators.csrf import csrf_exempt
 from django.views.generic import TemplateView
 
 from djangodav.responses import HttpResponsePreconditionFailed, HttpResponseCreated, HttpResponseNoContent, \
-    HttpResponseConflict, HttpResponseMediatypeNotSupported, HttpResponseBadGateway, \
-    HttpResponseMultiStatus, HttpResponseLocked, RedirectFSException, ResponseException, AsSendFileFS
-from djangodav.utils import WEBDAV_NSMAP, D, url_join, get_property_tag_list, rfc1123_date
-from djangodav import VERSION as djangodav_version
-from django import VERSION as django_version, get_version
+    HttpResponseConflict, HttpResponseMediatypeNotSupported, HttpResponseBadGateway, HttpResponseMultiStatus, \
+    HttpResponseLocked, ResponseException
+from djangodav.utils import WEBDAV_NSMAP, D, url_join, get_property_tag_list, rfc1123_date, rfc5987_content_disposition
 
-try:
-    import sendfile
-except ImportError:
-    sendfile = None
 
 PATTERN_IF_DELIMITER = re.compile(r'(<([^>]+)>)|(\(([^\)]+)\))')
 
+# get settings
+DJANGODAV_X_REDIRECT = getattr(settings, 'DJANGODAV_X_REDIRECT', None)
+DJANGODAV_X_REDIRECT_PREFIX = getattr(settings, 'DJANGODAV_X_REDIRECT_PREFIX', "")
+
+
 class DavView(TemplateView):
+    """
+    Basic WebDav View, providing the necessary endpoints for accessing WebDav via a Browser aswell as a File Explorer
+    """
     resource_class = None
     lock_class = None
     acl_class = None
     template_name = 'djangodav/index.html'
     http_method_names = ['options', 'put', 'mkcol', 'head', 'get', 'delete', 'propfind', 'proppatch', 'copy', 'move', 'lock', 'unlock']
-    server_header = 'DjangoDav/%s Django/%s Python/%s' % (
-        get_version(djangodav_version),
-        get_version(django_version),
-        get_version(python_version)
-    )
+    server_header = 'DjangoDav'
+
     xml_pretty_print = False
     xml_encoding = 'utf-8'
 
@@ -63,8 +69,10 @@ class DavView(TemplateView):
             and "/xml" in meta('CONTENT_TYPE', '')
             and meta('CONTENT_LENGTH', 0) != ''
             and int(meta('CONTENT_LENGTH', 0)) > 0):
+
+            # parse XML using defusedxmls parse function
             self.xbody = kwargs['xbody'] = etree.XPathDocumentEvaluator(
-                etree.parse(request, etree.XMLParser(ns_clean=True)),
+                parse(request, etree.XMLParser(ns_clean=True, resolve_entities=True)),
                 namespaces=WEBDAV_NSMAP
             )
 
@@ -136,49 +144,6 @@ class DavView(TemplateView):
             depth = int(depth)
         return depth
 
-    def evaluate_conditions(self, res):
-        if not res.exists:
-            return
-        etag = res.get_etag()
-        mtime = res.get_mtime_stamp()
-        cond_if_match = self.request.META.get('HTTP_IF_MATCH', None)
-        if cond_if_match:
-            etags = parse_etags(cond_if_match)
-            if '*' in etags or etag in etags:
-                raise ResponseException(HttpResponsePreconditionFailed())
-        cond_if_modified_since = self.request.META.get('HTTP_IF_MODIFIED_SINCE', False)
-        if cond_if_modified_since:
-            # Parse and evaluate, but don't raise anything just yet...
-            # This might be ignored based on If-None-Match evaluation.
-            cond_if_modified_since = parse_time(cond_if_modified_since)
-            if cond_if_modified_since and cond_if_modified_since > mtime:
-                cond_if_modified_since = True
-            else:
-                cond_if_modified_since = False
-        cond_if_none_match = self.request.META.get('HTTP_IF_NONE_MATCH', None)
-        if cond_if_none_match:
-            etags = parse_etags(cond_if_none_match)
-            if '*' in etags or etag in etags:
-                if self.request.method in ('GET', 'HEAD'):
-                    raise ResponseException(HttpResponseNotModified())
-                raise ResponseException(HttpResponsePreconditionFailed())
-            # Ignore If-Modified-Since header...
-            cond_if_modified_since = False
-        cond_if_unmodified_since = self.request.META.get('HTTP_IF_UNMODIFIED_SINCE', None)
-        if cond_if_unmodified_since:
-            cond_if_unmodified_since = parse_time(cond_if_unmodified_since)
-            if cond_if_unmodified_since and cond_if_unmodified_since <= mtime:
-                raise ResponseException(HttpResponsePreconditionFailed())
-        if cond_if_modified_since:
-            # This previously evaluated True and is not being ignored...
-            raise ResponseException(HttpResponseNotModified())
-        # TODO: complete If header handling...
-        cond_if = self.request.META.get('HTTP_IF', None)
-        if cond_if:
-            if not cond_if.startswith('<'):
-                cond_if = '<*>' + cond_if
-            #for (tmpurl, url, tmpcontent, content) in PATTERN_IF_DELIMITER.findall(cond_if):
-
     def get_context_data(self, **kwargs):
         context = super(DavView, self).get_context_data(**kwargs)
         context['resource'] = self.resource
@@ -186,49 +151,109 @@ class DavView(TemplateView):
         return context
 
     def get(self, request, path, head=False, *args, **kwargs):
+        """
+        GET a resource
+
+        If head=True, only the headers are returned
+
+        This method also handles X-Accel-Redirect headers
+
+        :param request:
+        :param path:
+        :param head:
+        :param args:
+        :param kwargs:
+        :return:
+        """
         if not self.resource.exists:
+            # Resource does not exist
             raise Http404("Resource doesn't exists")
         if not path.endswith("/") and self.resource.is_collection:
+            # make sure collections always end with a slash
             return HttpResponseRedirect(request.build_absolute_uri() + "/")
         if path.endswith("/") and self.resource.is_object:
+            # make sure files do not end with a slash
             return HttpResponseRedirect(request.build_absolute_uri().rstrip("/"))
-        response = HttpResponse()
-        if head:
-            response['Content-Length'] = 0
+
+        # make sure the user has access
         if not self.has_access(self.resource, 'read'):
             return self.no_access()
+
+        # construct a response
+        response = FileResponse()
+
+        # set default content length to 0 - we can still overwrite it later
+        response['Content-Length'] = 0
+
+        # it's either an object or a collection
         if self.resource.is_object:
+            # is an object
             response['Content-Type'] = self.resource.content_type
-            response['ETag'] = self.resource.getetag
+            response['ETag'] = self.resource.etag
+            response['Content-Length'] = self.resource.getcontentlength
+
             if not head:
-                response['Content-Length'] = self.resource.getcontentlength
-                try:
-                    response.content = self.resource.read()
-                except AsSendFileFS:
-                    assert sendfile is not None, "django-sendfile is not installed."
-                    full_path = self.resource.get_abs_path()
-                    if self.resource.quote:
-                        full_path = urllib.quote(full_path)
-                    response = sendfile.sendfile(request, full_path)
-                    return response
-                except RedirectFSException:
+                # not a head request, so we can actually return a response
+                if DJANGODAV_X_REDIRECT:
+                    # Using X-Accel-Redirect
+                    # create a new response that handles x-accel-redirect
                     response = HttpResponse()
-                    response['X-Accel-Redirect'] = url_join(self.resource.prefix, self.resource.get_path().encode('utf-8'))
-                    response['X-Accel-Charset'] = 'utf-8'
-                    response['Content-Type'] = mimetypes.guess_type(self.resource.displayname)
-                    response['Content-Length'] = self.resource.getcontentlength
-                    response['Last-Modified'] = http_date(self.resource.getlastmodified)
-                    response['ETag'] = self.resource.getetag
-                    raise ResponseException(response)
+
+                    # make sure to redirect to the actual file path, and not the provided path in get_path()
+                    relpath = os.path.relpath(self.resource.read().name, self.resource.root)
+
+                    # we are not allowed to send utf8 headers, so we need to make sure to quote it
+                    response['X-Accel-Redirect'] = urlquote(
+                        # join url with the DAV prefix
+                        url_join(DJANGODAV_X_REDIRECT_PREFIX, relpath)
+                    )
+                    # set the display name as the content disposition header, acting as the download name of the file
+                    response['Content-Disposition'] = rfc5987_content_disposition(self.resource.displayname)
+                    response['Content-Type'] = self.resource.content_type
+
+                    # Unfortunately, setting content-length, last-modified and etag does not work with nginx, as those
+                    # are overwritten by nginx, see https://forum.nginx.org/read.php?2,205636,205665#msg-205665
+                    # Therefore we need to set them with a prefix, e.g., X-Accel-, and handle it with nginx
+                    # add_header and $upstream_http_*
+                    response['X-Accel-Content-Length'] = self.resource.getcontentlength
+                    response['X-Accel-Last-Modified'] = self.resource.get_modified().ctime()
+                    response['X-Accel-ETag'] = self.resource.etag
+
+                    return response
+                else:
+                    # try to read the resource and return it in response
+                    response.streaming_content = self.resource.read()
         elif not head:
+            # not a head request, and not an object -> render index.html
             response = super(DavView, self).get(request, *args, **kwargs)
+
+        # set last modified field of response, so browsers and other tools can properly handle caching
         response['Last-Modified'] = self.resource.getlastmodified
+
         return response
 
     def head(self, request, path, *args, **kwargs):
+        """
+        Return just the headers
+
+        Calls the get function with head=True, so the get function knows to only return ehaders
+        :param request:
+        :param path:
+        :param args:
+        :param kwargs:
+        :return:
+        """
         return self.get(request, path, head=True, *args, **kwargs)
 
     def put(self, request, path, *args, **kwargs):
+        """
+        Upload a new file
+        :param request:
+        :param path:
+        :param args:
+        :param kwargs:
+        :return:
+        """
         parent = self.resource.get_parent()
         if not parent.exists:
             return HttpResponseConflict("Resource doesn't exists")
@@ -239,7 +264,14 @@ class DavView(TemplateView):
         if self.resource.exists and not self.has_access(self.resource, 'write'):
             return self.no_access()
         created = not self.resource.exists
-        self.resource.write(request)
+
+        # check headers for X-File-Name
+        file_name_forwarding = request.META.get('HTTP_X_FILE_NAME', None)
+        if file_name_forwarding:
+            self.resource.write(request, file_name_forwarding)
+        else:
+            self.resource.write(request)
+
         if created:
             self.__dict__['resource'] = self.get_resource(path=self.resource.get_path())
             return HttpResponseCreated()
@@ -247,6 +279,14 @@ class DavView(TemplateView):
             return HttpResponseNoContent()
 
     def delete(self, request, path, *args, **kwargs):
+        """
+        Delete an element
+        :param request:
+        :param path:
+        :param args:
+        :param kwargs:
+        :return:
+        """
         if not self.resource.exists:
             raise Http404("Resource doesn't exists")
         if not self.has_access(self.resource, 'delete'):
@@ -258,6 +298,14 @@ class DavView(TemplateView):
         return response
 
     def mkcol(self, request, path, *args, **kwargs):
+        """
+        Create a new collection (a directory)
+        :param request:
+        :param path:
+        :param args:
+        :param kwargs:
+        :return:
+        """
         if self.resource.exists:
             return HttpResponseNotAllowed(list(set(self._allowed_methods()) - set(['MKCOL', 'PUT'])))
         if not self.resource.get_parent().exists:
@@ -272,15 +320,29 @@ class DavView(TemplateView):
         return HttpResponseCreated()
 
     def relocate(self, request, path, method, *args, **kwargs):
+        """
+        Relocate an element
+
+        Handles copying and moving of all sorts of elements
+        :param request:
+        :param path:
+        :param method:
+        :param args:
+        :param kwargs:
+        :return:
+        """
         if not self.resource.exists:
             raise Http404("Resource doesn't exists")
         if not self.has_access(self.resource, 'read'):
             return self.no_access()
-        dst = urlparse.unquote(request.META.get('HTTP_DESTINATION', '')).decode(self.xml_encoding)
+        dst = urllib.parse.unquote(request.META.get('HTTP_DESTINATION', ''))  # .decode(self.xml_encoding)
         if not dst:
             return HttpResponseBadRequest('Destination header missing.')
-        dparts = urlparse.urlparse(dst)
-        sparts = urlparse.urlparse(request.build_absolute_uri())
+
+        original_dst = dst
+
+        dparts = urllib.parse.urlparse(dst)
+        sparts = urllib.parse.urlparse(request.build_absolute_uri())
         if sparts.scheme != dparts.scheme or sparts.hostname != dparts.hostname:
             return HttpResponseBadGateway('Source and destination must have the same scheme and host.')
         # adjust path for our base url:
@@ -302,18 +364,41 @@ class DavView(TemplateView):
             dst.delete()
         errors = getattr(self.resource, method)(dst, *args, **kwargs)
         if errors:
+            print(errors)
             return self.build_xml_response(response_class=HttpResponseMultiStatus) # WAT?
         if dst_exists:
             return HttpResponseNoContent()
-        return HttpResponseCreated()
+
+        # return a response with the new location
+        response = HttpResponseCreated()
+        response['Location'] = original_dst
+        return response
 
     def copy(self, request, path, xbody):
+        """
+        Copy an element
+        :param request:
+        :param path: full path of the element that is about to be copied
+        :param xbody:
+        :return:
+        """
         depth = self.get_depth()
-        if depth != -1:
-            return HttpResponseBadRequest()
+        # if depth != -1:
+        #     print("canceling because depth=", depth)
+        #     return HttpResponseBadRequest()
+
+        print("Copying {} located at {} to ...".format(self.resource.displayname, path))
+
         return self.relocate(request, path, 'copy', depth=depth)
 
     def move(self, request, path, xbody):
+        """
+        Move an element
+        :param request:
+        :param path: full path of the element that is about to be moved
+        :param xbody:
+        :return:
+        """
         if not self.has_access(self.resource, 'delete'):
             return self.no_access()
         return self.relocate(request, path, 'move')
@@ -368,7 +453,7 @@ class DavView(TemplateView):
         body = D.activelock(*([
             D.locktype(locktype_obj),
             D.lockscope(lockscope_obj),
-            D.depth(unicode(depth)),
+            D.depth(str(depth)),
             D.timeout("Second-%s" % timeout),
             D.locktoken(D.href('opaquelocktoken:%s' % token))]
             + ([owner_obj] if owner_obj is not None else [])
