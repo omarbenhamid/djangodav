@@ -335,14 +335,14 @@ class DavView(TemplateView):
             raise Http404("Resource doesn't exists")
         if not self.has_access(self.resource, 'read'):
             return self.no_access()
-        dst = urllib.parse.unquote(request.META.get('HTTP_DESTINATION', ''))  # .decode(self.xml_encoding)
+        dst = urlparse.unquote(request.META.get('HTTP_DESTINATION', ''))  # .decode(self.xml_encoding)
         if not dst:
             return HttpResponseBadRequest('Destination header missing.')
 
         original_dst = dst
 
-        dparts = urllib.parse.urlparse(dst)
-        sparts = urllib.parse.urlparse(request.build_absolute_uri())
+        dparts = urlparse.urlparse(dst)
+        sparts = urlparse.urlparse(request.build_absolute_uri())
         if sparts.scheme != dparts.scheme or sparts.hostname != dparts.hostname:
             return HttpResponseBadGateway('Source and destination must have the same scheme and host.')
         # adjust path for our base url:
