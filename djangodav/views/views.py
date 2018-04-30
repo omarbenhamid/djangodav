@@ -2,6 +2,8 @@ import os
 import re
 
 # import urllib.parse
+from django.core.exceptions import PermissionDenied, ValidationError
+
 try:
     # Python 2.7
     import urlparse
@@ -56,6 +58,14 @@ class DavView(TemplateView):
 
     @method_decorator(csrf_exempt)
     def dispatch(self, request, path, *args, **kwargs):
+        """
+        Basic dispatch handler for all requests coming to the
+        :param request:
+        :param path:
+        :param args:
+        :param kwargs:
+        :return:
+        """
         if path:
             self.path = path
             self.base_url = request.META['PATH_INFO'][:-len(self.path)]
@@ -84,6 +94,11 @@ class DavView(TemplateView):
             resp = handler(request, self.path, *args, **kwargs)
         except ResponseException as e:
             resp = e.response
+        except PermissionDenied as pe:
+            resp = HttpResponseForbidden()
+        except ValidationError as ve:
+            resp = HttpResponseBadRequest()
+
         if not 'Allow' in resp:
             methods = self._allowed_methods()
             if methods:
