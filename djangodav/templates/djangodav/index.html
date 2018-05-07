@@ -37,7 +37,10 @@
 </tr>
 <tr><th colspan="4"><hr></th></tr>
 <tr>
-    <td colspan="4"><a href="{{ base_url }}{% if not resource.get_escaped_path %}/{% endif %}{{ resource.get_parent.get_escaped_path }}">Parent Directory</a></td>
+    <td colspan="4">
+        {# link to parent directory #}
+        <a href="{{ parent_directory_url }}">Parent Directory</a>
+    </td>
 </tr>
 {% for child in resource.get_children %}
 <tr>

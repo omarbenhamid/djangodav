@@ -163,6 +163,8 @@ class DavView(TemplateView):
         context = super(DavView, self).get_context_data(**kwargs)
         context['resource'] = self.resource
         context['base_url'] = self.base_url
+        # build parent directory according to the current request
+        context['parent_directory_url'] = self.request.build_absolute_uri("/".join(self.request.path.rstrip('/').split('/')[:-1]))
         return context
 
     def get(self, request, path, head=False, *args, **kwargs):
