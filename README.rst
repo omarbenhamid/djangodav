@@ -100,7 +100,7 @@ Windows enforces a 47 MB limit on WebDav files. See `this issue on Microsoft Ans
 aswell as `this issue on StackExchange <https://sharepoint.stackexchange.com/questions/119302/error-0x800700df-the-file-size-exceeds-the-limit-allowed-and-cannot-be-saved>`_.
 It can be fixed by increasing the registry parameter ``HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\WebClient\Parameters`` to ``4294967295``.
 
-Another way to fix this issue is using a dedicated WebDav client for Windows.
+Another way to fix this issue is using a dedicated WebDav client for Windows, such as `RaiDrive <https://www.raidrive.com/>`_.
 
 Examples / Getting started
 --------------------------
