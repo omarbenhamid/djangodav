@@ -93,10 +93,13 @@ class DavView(TemplateView):
         try:
             resp = handler(request, self.path, *args, **kwargs)
         except ResponseException as e:
+            print(e)
             resp = e.response
         except PermissionDenied as pe:
+            print(pe)
             resp = HttpResponseForbidden()
         except ValidationError as ve:
+            print(ve)
             resp = HttpResponseBadRequest()
 
         if not 'Allow' in resp:
