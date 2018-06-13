@@ -219,8 +219,16 @@ class DavView(TemplateView):
                     # create a new response that handles x-accel-redirect
                     response = HttpResponse()
 
-                    # make sure to redirect to the actual file path, and not the provided path in get_path()
-                    relpath = os.path.relpath(self.resource.read().name, self.resource.root)
+                    # get the path to the requested file
+                    current_path_to_file = self.resource.read().name
+
+                    # make sure the path is relative
+                    if current_path_to_file.startswith("/"):
+                        # absolute path - convert it into a path relative to the resources root path
+                        relpath = os.path.relpath(self.resource.read().name, self.resource.root)
+                    else:
+                        # it's already a relative path, everything is fine
+                        relpath = self.resource.read().name
 
                     # we are not allowed to send utf8 headers, so we need to make sure to quote it
                     response['X-Accel-Redirect'] = urlquote(
