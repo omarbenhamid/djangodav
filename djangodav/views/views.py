@@ -47,7 +47,17 @@ class DavView(TemplateView):
     lock_class = None
     acl_class = None
     template_name = 'djangodav/index.html'
-    http_method_names = ['options', 'put', 'mkcol', 'head', 'get', 'delete', 'propfind', 'proppatch', 'copy', 'move', 'lock', 'unlock']
+
+    # list of all http method names that are allowed
+    http_method_names = [
+        'options', 'put', 'mkcol', 'head', 'get', 'delete', 'propfind', 'proppatch', 'copy', 'move', 'lock', 'unlock'
+    ]
+
+    # list of DAV http headers sent by the server
+    dav_http_headers = {
+        'DAV': "1, 2"  # might aswell be "1, 2, calendar, calendar-access"
+    }
+
     server_header = 'DjangoDav'
 
     xml_pretty_print = False
@@ -86,52 +96,81 @@ class DavView(TemplateView):
                 namespaces=WEBDAV_NSMAP
             )
 
-        if request.method.upper() in self._allowed_methods():
+        # verify that the request method is in the allowed http methods
+        if request.method.upper() in self.get_allowed_http_methods():
             handler = getattr(self, request.method.lower(), self.http_method_not_allowed)
         else:
             handler = self.http_method_not_allowed
         try:
-            resp = handler(request, self.path, *args, **kwargs)
+            response = handler(request, self.path, *args, **kwargs)
         except ResponseException as e:
             print(e)
-            resp = e.response
+            response = e.response
         except PermissionDenied as pe:
             print(pe)
-            resp = HttpResponseForbidden()
+            response = HttpResponseForbidden()
         except ValidationError as ve:
             print(ve)
-            resp = HttpResponseBadRequest()
+            response = HttpResponseBadRequest()
 
-        if not 'Allow' in resp:
-            methods = self._allowed_methods()
+        # add allowed http methods (if they are not already there)
+        if 'Allow' not in response:
+            methods = self.get_allowed_http_methods()
             if methods:
-                resp['Allow'] = ", ".join(methods)
-        if not 'Date' in resp:
-            resp['Date'] = rfc1123_date(now())
-        if self.server_header:
-            resp['Server'] = self.server_header
-        return resp
+                response['Allow'] = ", ".join(methods)
 
-    def options(self, request, path, *args, **kwargs):
-        if not self.has_access(self.resource, 'read'):
-            return self.no_access()
-        response = self.build_xml_response()
-        response['DAV'] = '1,2'
-        response['Content-Length'] = '0'
-        if self.path in ('/', '*'):
-            return response
-        response['Allow'] = ", ".join(self._allowed_methods())
-        if self.resource.exists and self.resource.is_object:
-            response['Allow-Ranges'] = 'bytes'
+        # process all general dav headers
+        # e,g., response['DAV'] = '1,2'
+        for key in self.dav_http_headers:
+            response[key] = self.dav_http_headers[key]
+
+        # add a date into the headers
+        if not 'Date' in response:
+            response['Date'] = rfc1123_date(now())
+
+        # and add the server header
+        if self.server_header:
+            response['Server'] = self.server_header
+
         return response
 
-    def _allowed_methods(self):
-        allowed = [
-            'HEAD', 'OPTIONS', 'PROPFIND', 'LOCK', 'UNLOCK',
-            'GET', 'DELETE', 'PROPPATCH', 'COPY', 'MOVE', 'PUT', 'MKCOL',
-        ]
+    def options(self, request, path, *args, **kwargs):
+        """
+        Options Call
+        :param request:
+        :param path:
+        :param args:
+        :param kwargs:
+        :return:
+        """
+        if not self.has_access(self.resource, 'read'):
+            return self.no_access()
 
-        return allowed
+        response = self.build_xml_response()
+
+        response['Content-Length'] = '0'
+
+        if self.path in ('/', '*'):
+            return response
+
+        if self.resource.exists and self.resource.is_object:
+            response['Allow-Ranges'] = 'bytes'
+
+        return response
+
+    def get_allowed_http_methods(self):
+        """
+        Returns an uppercased list of allowed methods
+        :return:
+        """
+        return [x.upper() for x in self.http_method_names]
+        #
+        # allowed = [
+        #     'HEAD', 'OPTIONS', 'PROPFIND', 'LOCK', 'UNLOCK',
+        #     'GET', 'DELETE', 'PROPPATCH', 'COPY', 'MOVE', 'PUT', 'MKCOL',
+        # ]
+        #
+        # return allowed
 
     def get_access(self, resource):
         """Return permission as DavAcl object. A DavACL should have the following attributes:
@@ -283,14 +322,21 @@ class DavView(TemplateView):
         :return:
         """
         parent = self.resource.get_parent()
+
         if not parent.exists:
             return HttpResponseConflict("Resource doesn't exists")
+
         if self.resource.is_collection:
-            return HttpResponseNotAllowed(list(set(self._allowed_methods()) - set(['MKCOL', 'PUT'])))
+            # can not PUT (upload) on a resource (e.g., a directory/folder)
+            # return a method not allowed response - and provide all methods except for mkcol and put as allowed
+            return HttpResponseNotAllowed(list(set(self.get_allowed_http_methods()) - set(['MKCOL', 'PUT'])))
+
         if not self.resource.exists and not self.has_access(parent, 'write'):
             return self.no_access()
+
         if self.resource.exists and not self.has_access(self.resource, 'write'):
             return self.no_access()
+
         created = not self.resource.exists
 
         # check headers for X-File-Name
@@ -335,7 +381,7 @@ class DavView(TemplateView):
         :return:
         """
         if self.resource.exists:
-            return HttpResponseNotAllowed(list(set(self._allowed_methods()) - set(['MKCOL', 'PUT'])))
+            return HttpResponseNotAllowed(list(set(self.get_allowed_http_methods()) - set(['MKCOL', 'PUT'])))
         if not self.resource.get_parent().exists:
             return HttpResponseConflict()
         length = request.META.get('CONTENT_LENGTH', 0)
@@ -585,3 +631,15 @@ class DavView(TemplateView):
             content_type='text/xml; charset="%s"' % self.xml_encoding,
             **kwargs
         )
+
+
+class CalDavView(DavView):
+    # extend the dav http headers
+    dav_http_headers = {
+        'DAV': "1, 2, calendar, calendar-access"
+    }
+
+    def __init__(self, *args, **kwargs):
+        super(CalDavView, self).__init__(*args, **kwargs)
+        # add the mkcalendar method name
+        self.http_method_names += "mkcalendar"

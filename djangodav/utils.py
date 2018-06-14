@@ -49,25 +49,56 @@ FORMAT_RFC_850 = '%A %d-%b-%y %H:%M:%S GMT'
 FORMAT_ASC = '%a %b %d %H:%M:%S %Y'
 
 WEBDAV_NS = "DAV:"
+CALDAV_NS = "urn:ietf:params:xml:ns:caldav"
 
-WEBDAV_NSMAP = {'D': WEBDAV_NS}
+# defines the XML Namespace map
+WEBDAV_NSMAP = {
+    # dav
+    'D': WEBDAV_NS,
+    # caldav
+    'cal': CALDAV_NS,
+    # carddav
+    'card': "urn:ietf:params:xml:ns:carddav"
+}
 
 D = lb.ElementMaker(namespace=WEBDAV_NS, nsmap=WEBDAV_NSMAP)
+CAL = lb.ElementMaker(namespace=CALDAV_NS, nsmap=WEBDAV_NSMAP)
 
 
 def get_property_tag_list(res, *names):
+    """
+    Calls get_property_tag for each property given
+    :param res:
+    :param names:
+    :return:
+    """
     props = []
+
+    # iterate over all property names
     for name in names:
         tag = get_property_tag(res, name)
+
+        # avoid empty properties
         if tag is None:
             continue
+
         props.append(tag)
+
     return props
 
 
 def get_property_tag(res, name):
+    """
+    Tries to get a dav xml property from the provided resource
+    The provided resource needs to implement this as a property, so we can do a "getattr" on it
+    :param res:
+    :param name:
+    :return:
+    """
     if name == 'resourcetype':
-        if res.is_collection:
+        if hasattr(res, "is_calendar") and res.is_calendar:
+            return D(name, D.collection, CAL.calendar)
+        elif res.is_collection:
             return D(name, D.collection)
         return D(name)
     try:
