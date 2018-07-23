@@ -98,7 +98,7 @@ File Size Limit of 47 MB on Windows (Error 0x800700DF)
 
 Windows enforces a 47 MB limit on WebDav files. See `this issue on Microsoft Answers <https://answers.microsoft.com/en-us/ie/forum/ie8-windows_xp/error-0x800700df-the-file-size-exceeds-the-limit/d208bba6-920c-4639-bd45-f345f462934f>`_ 
 aswell as `this issue on StackExchange <https://sharepoint.stackexchange.com/questions/119302/error-0x800700df-the-file-size-exceeds-the-limit-allowed-and-cannot-be-saved>`_.
-It can be fixed by increasing the registry parameter ``HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\WebClient\Parameters`` to ``4294967295``.
+It can be fixed by increasing the registry parameter ``FileSizeLimitInBytes`` in ``HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\WebClient\Parameters`` to ``4294967295``.
 
 Another way to fix this issue is using a dedicated WebDav client for Windows, such as `RaiDrive <https://www.raidrive.com/>`_.
 

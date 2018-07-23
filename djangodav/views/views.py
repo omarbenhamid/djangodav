@@ -363,7 +363,8 @@ class DavView(TemplateView):
             raise Http404("Resource doesn't exists")
         if not self.has_access(self.resource, 'read'):
             return self.no_access()
-        dst = urlparse.unquote(request.META.get('HTTP_DESTINATION', ''))  # .decode(self.xml_encoding)
+        # need to double unquote the HTTP_DESTINATION header (Windows 7 Compatibility)
+        dst = urlparse.unquote(urlparse.unquote(request.META.get('HTTP_DESTINATION', '')))  # .decode(self.xml_encoding)
         if not dst:
             return HttpResponseBadRequest('Destination header missing.')
 
