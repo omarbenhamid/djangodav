@@ -295,12 +295,7 @@ class DavView(TemplateView):
             return self.no_access()
         created = not self.resource.exists
 
-        # check headers for X-File-Name
-        file_name_forwarding = request.META.get('HTTP_X_FILE_NAME', None)
-        if file_name_forwarding:
-            self.resource.write(request, file_name_forwarding)
-        else:
-            self.resource.write(request)
+        self.resource.write(request)
 
         if created:
             self.__dict__['resource'] = self.get_resource(path=self.resource.get_path())
