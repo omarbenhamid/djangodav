@@ -29,7 +29,7 @@ Create simple filesystem webdav resource
 
     from django.conf.urls import patterns
 
-    from .resource import TempDirWebDavResource
+    from .resource import MyDavResource
 
     urlpatterns = patterns('',
         (r'^fsdav(?P<path>.*)$', DavView.as_view(resource_class=MyDavResource, lock_class=DummyLock,

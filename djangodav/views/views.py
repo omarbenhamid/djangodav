@@ -33,7 +33,7 @@ from djangodav.utils import WEBDAV_NSMAP, D, url_join, get_property_tag_list, rf
 
 
 PATTERN_IF_DELIMITER = re.compile(r'(<([^>]+)>)|(\(([^\)]+)\))')
-
+PATTERN_CONTENT_RANGE=re.compile('^\s*bytes\s*([0-9]*)-.*$')
 # get settings
 DJANGODAV_X_REDIRECT = getattr(settings, 'DJANGODAV_X_REDIRECT', None)
 DJANGODAV_X_REDIRECT_PREFIX = getattr(settings, 'DJANGODAV_X_REDIRECT_PREFIX', "")
@@ -122,7 +122,7 @@ class DavView(TemplateView):
             return response
         response['Allow'] = ", ".join(self._allowed_methods())
         if self.resource.exists and self.resource.is_object:
-            response['Allow-Ranges'] = 'bytes'
+            response['Accept-Ranges'] = 'bytes'
         return response
 
     def _allowed_methods(self):
@@ -213,6 +213,7 @@ class DavView(TemplateView):
             response['Content-Type'] = self.resource.content_type
             response['ETag'] = self.resource.etag
             response['Content-Length'] = self.resource.getcontentlength
+            response['Accept-Ranges'] = 'bytes'
 
             if not head:
                 # not a head request, so we can actually return a response
@@ -295,7 +296,16 @@ class DavView(TemplateView):
             return self.no_access()
         created = not self.resource.exists
 
-        self.resource.write(request)
+        # check headers for X-File-Name
+        range = request.META.get('HTTP_CONTENT_RANGE', None)
+        if range == None:
+            range_start=None
+        else:
+            m=PATTERN_CONTENT_RANGE.match(range)
+            if not m: return HttpResponseBadRequest("Invalid Content-Range")
+            range_start=int(m[1])
+            
+        self.resource.write(request, range_start=range_start)
 
         if created:
             self.__dict__['resource'] = self.get_resource(path=self.resource.get_path())

@@ -89,7 +89,7 @@ class BaseFSDavResource(BaseDavResource):
                     child = child.decode(fs_encoding)
                 yield self.clone(url_join(*(self.path + [child])))
 
-    def write(self, content, temp_file=None):
+    def write(self, content, temp_file=None, range_start=None):
         raise NotImplementedError
 
     def read(self):
@@ -124,16 +124,20 @@ class DummyWriteFSDavResource(BaseFSDavResource):
     """
     Provides a "dummy" write method for FS Dav Resources
     """
-    def write(self, request, temp_file=None):
+    def write(self, request, temp_file=None, range_start=None):
         print("temp_file=", temp_file)
         if temp_file:
             # move temp file (e.g., coming from nginx)
             shutil.move(temp_file, self.get_abs_path())
-        else:
+        elif range_start == None:
             # open binary file and write to disk
             with open(self.get_abs_path(), 'wb') as dst:
                 shutil.copyfileobj(request, dst)
-
+        else:
+            # open binary file and write to disk
+            with open(self.get_abs_path(), 'r+b') as dst:
+                dst.seek(range_start)
+                shutil.copyfileobj(request, dst)
 
 class DummyFSDAVResource(DummyReadFSDavResource, DummyWriteFSDavResource, BaseFSDavResource):
     pass
