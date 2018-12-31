@@ -187,6 +187,8 @@ class DavView(TemplateView):
         """
         if not self.resource.exists:
             # Resource does not exist
+            if head:
+                return HttpResponse(content='', status=404)
             raise Http404("Resource doesn't exists")
         if not path.endswith("/") and self.resource.is_collection:
             # make sure collections always end with a slash
