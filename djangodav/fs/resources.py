@@ -125,7 +125,6 @@ class DummyWriteFSDavResource(BaseFSDavResource):
     Provides a "dummy" write method for FS Dav Resources
     """
     def write(self, request, temp_file=None, range_start=None):
-        print("temp_file=", temp_file)
         if temp_file:
             # move temp file (e.g., coming from nginx)
             shutil.move(temp_file, self.get_abs_path())
