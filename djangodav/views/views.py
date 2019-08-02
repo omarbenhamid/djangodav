@@ -215,7 +215,12 @@ class DavView(TemplateView):
             response['Content-Length'] = self.resource.getcontentlength
             response['Accept-Ranges'] = 'bytes'
             response['Cache-Control'] = 'must-revalidate'
-
+            
+            etags = request.META.get('HTTP_IF_NONE_MATCH',None)
+            if etags \
+                and (self.resource.etag in (e.strip(' ').strip('"') for e in etags.split(','))):
+                     response.status_code=304
+                     return response
             if not head:
                 # not a head request, so we can actually return a response
                 if DJANGODAV_X_REDIRECT:
