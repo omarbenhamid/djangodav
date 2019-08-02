@@ -214,6 +214,7 @@ class DavView(TemplateView):
             response['ETag'] = self.resource.etag
             response['Content-Length'] = self.resource.getcontentlength
             response['Accept-Ranges'] = 'bytes'
+            response['Cache-Control'] = 'must-revalidate'
 
             if not head:
                 # not a head request, so we can actually return a response
