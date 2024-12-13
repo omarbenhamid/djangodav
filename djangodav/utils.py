@@ -30,7 +30,7 @@ import unicodedata
 
 from wsgiref.handlers import format_date_time
 
-from django.utils.http import urlquote
+from urllib.parse import quote as urlquote
 from django.utils.feedgenerator import rfc2822_date
 
 try:

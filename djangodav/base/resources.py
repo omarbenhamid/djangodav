@@ -24,7 +24,7 @@
 from hashlib import md5
 from mimetypes import guess_type
 
-from django.utils.http import urlquote
+from urllib.parse import quote as urlquote
 from djangodav.utils import rfc3339_date, rfc1123_date, safe_join
 
 

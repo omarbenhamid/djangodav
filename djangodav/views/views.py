@@ -21,7 +21,7 @@ from django.http import HttpResponseForbidden, HttpResponseNotAllowed, HttpRespo
     HttpResponseRedirect, Http404, HttpResponse, FileResponse
 from django.utils.decorators import method_decorator
 from django.utils.functional import cached_property
-from django.utils.http import urlquote
+from urllib.parse import quote as urlquote
 from django.utils.timezone import now
 from django.views.decorators.csrf import csrf_exempt
 from django.views.generic import TemplateView
